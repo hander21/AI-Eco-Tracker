@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Infrastructure Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  ============================================================
+  VISUAL / STYLE ZONE — safe to restyle freely
+  ============================================================
+-->
+<style>
+  :root{
+    --bg:#050816; --bg2:#080c1e; --glass:rgba(255,255,255,.06); --glass-hi:rgba(255,255,255,.10);
+    --border:rgba(255,255,255,.10); --border-hi:rgba(255,255,255,.20);
+    --text:#eef1fb; --text-dim:#9aa3c0; --text-faint:#5c6486;
+    --cyan:#57d5ee; --blue:#5764ee; --purple:#af57ee; --teal:#2dd4bf; --pink:#ee57ad;
+    --radius:18px; --radius-sm:12px;
+    --font-head:'Space Grotesk',sans-serif; --font-body:'Plus Jakarta Sans',-apple-system,sans-serif;
+  }
+  html[data-theme="light"]{
+    --bg:#eef1f8; --bg2:#e4e8f4; --glass:rgba(255,255,255,.55); --glass-hi:rgba(255,255,255,.85);
+    --border:rgba(20,25,50,.10); --border-hi:rgba(20,25,50,.22);
+    --text:#12152a; --text-dim:#4c5372; --text-faint:#8a90ab;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{width:100%; height:100%; background:var(--bg); overflow:hidden; font-family:var(--font-body); color:var(--text);}
+  body{
+    background:
+      radial-gradient(ellipse 1200px 700px at 12% -10%, rgba(87,213,238,.10), transparent 60%),
+      radial-gradient(ellipse 1000px 800px at 90% 10%, rgba(175,87,238,.10), transparent 55%),
+      radial-gradient(ellipse 1400px 900px at 50% 120%, rgba(238,87,173,.06), transparent 60%),
+      var(--bg);
+    transition:background .3s, color .3s;
+  }
+  ::selection{ background:rgba(87,213,238,.3); }
+  #app{ position:relative; width:100%; height:100vh; display:flex; flex-direction:column; }
+
+  /* ---------- Topbar ---------- */
+  #topbar{
+    height:64px; flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 22px;
+    background:var(--glass); backdrop-filter:blur(24px) saturate(140%); border-bottom:1px solid var(--border);
+    z-index:40; position:relative;
+  }
+  #brand{ display:flex; align-items:center; gap:10px; white-space:nowrap; }
+  #brand .mark{
+    width:30px; height:30px; border-radius:9px; flex:0 0 auto;
+    background:conic-gradient(from 220deg, var(--cyan), var(--blue), var(--purple), var(--pink), var(--cyan));
+    box-shadow:0 0 18px rgba(87,213,238,.45);
+  }
+  #brand .name{ font-family:var(--font-head); font-weight:700; font-size:15px; letter-spacing:.01em; }
+  #brand .name b{ font-weight:700; background:linear-gradient(90deg,var(--cyan),var(--purple)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #brand .tag{ font-size:10px; color:var(--text-faint); letter-spacing:.08em; text-transform:uppercase; margin-top:1px; }
+
+  #searchWrap{ position:relative; flex:0 0 260px; }
+  #search{
+    width:100%; height:36px; padding:0 14px 0 34px; background:rgba(255,255,255,.04); border:1px solid var(--border);
+    border-radius:10px; color:var(--text); font-family:var(--font-body); font-size:13px; outline:none;
+  }
+  #search::placeholder{ color:var(--text-faint); }
+  #search:focus{ border-color:var(--cyan); box-shadow:0 0 0 3px rgba(87,213,238,.12); }
+  #searchWrap svg{ position:absolute; left:11px; top:50%; transform:translateY(-50%); width:14px; height:14px; stroke:var(--text-faint); pointer-events:none; }
+
+  .btn{
+    height:36px; padding:0 13px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px;
+    color:var(--text-dim); font-family:var(--font-body); font-size:12.5px; font-weight:500; cursor:pointer;
+    display:flex; align-items:center; gap:6px; transition:all .18s; white-space:nowrap;
+  }
+  .btn:hover{ color:var(--text); border-color:var(--border-hi); background:rgba(255,255,255,.07); }
+  .btn.primary{
+    background:linear-gradient(135deg, rgba(87,213,238,.18), rgba(175,87,238,.18)); border-color:rgba(87,213,238,.35); color:var(--text);
+  }
+  .btn.primary:hover{ border-color:var(--cyan); box-shadow:0 0 16px rgba(87,213,238,.25); }
+  .btn.on{ color:var(--cyan); border-color:var(--cyan); background:rgba(87,213,238,.10); }
+  #topbar-right{ margin-left:auto; display:flex; gap:8px; align-items:center; }
+  #stats{ font-size:11px; color:var(--text-faint); white-space:nowrap; margin-right:4px; font-variant-numeric:tabular-nums; }
+
+  /* ---------- Canvas ---------- */
+  #canvasWrap{ position:relative; flex:1 1 auto; overflow:hidden; }
+  #linksLayer{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:30; overflow:visible; }
+  #districts{
+    position:relative; height:100%; display:flex; align-items:stretch; gap:8px;
+    padding:26px 46px 40px; overflow-x:auto; overflow-y:hidden; scroll-behavior:smooth;
+    scroll-snap-type:x proximity;
+  }
+  #districts::-webkit-scrollbar{ height:9px; }
+  #districts::-webkit-scrollbar-track{ background:transparent; }
+  #districts::-webkit-scrollbar-thumb{ background:var(--border-hi); border-radius:10px; }
+
+  .flow-arrow{
+    flex:0 0 34px; display:flex; align-items:center; justify-content:center; align-self:center;
+    height:60px; position:relative; opacity:.85;
+  }
+  .flow-arrow svg{ width:30px; height:16px; overflow:visible; }
+  .flow-arrow .chev{ stroke:var(--district-c, var(--cyan)); stroke-width:2; fill:none; opacity:0; animation:chevFlow 2.2s linear infinite; }
+  .flow-arrow .chev:nth-child(2){ animation-delay:.35s; }
+  .flow-arrow .chev:nth-child(3){ animation-delay:.7s; }
+  @keyframes chevFlow{
+    0%{ opacity:0; transform:translateX(-6px); }
+    15%{ opacity:1; }
+    70%{ opacity:.9; }
+    100%{ opacity:0; transform:translateX(10px); }
+  }
+
+  .district{
+    --dc:#57d5ee;
+    flex:0 0 272px; scroll-snap-align:start; position:relative; display:flex; flex-direction:column;
+    max-height:100%; border-radius:var(--radius); border:1px solid var(--border);
+    background:
+      linear-gradient(165deg, color-mix(in srgb, var(--dc) 13%, transparent), transparent 45%),
+      var(--glass);
+    backdrop-filter:blur(22px) saturate(150%); overflow:hidden; transition:border-color .3s, box-shadow .3s;
+  }
+  .district.dimmed{ opacity:.3; }
+  .district-head{
+    padding:16px 17px 12px; border-bottom:1px solid var(--border); position:relative; flex:0 0 auto;
+  }
+  .district-head::before{
+    content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:linear-gradient(180deg, var(--dc), transparent);
+  }
+  .district-idx{ font-size:10px; color:var(--dc); font-weight:700; letter-spacing:.12em; font-family:var(--font-head); }
+  .district-title{ font-family:var(--font-head); font-size:15px; font-weight:700; margin-top:3px; letter-spacing:-.01em; }
+  .district-sub{ font-size:11px; color:var(--text-faint); margin-top:3px; }
+  .district-count{
+    position:absolute; top:16px; right:15px; font-size:10.5px; color:var(--dc); background:color-mix(in srgb, var(--dc) 16%, transparent);
+    padding:2px 8px; border-radius:20px; font-weight:600;
+  }
+  .district-body{
+    padding:12px; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; gap:9px; flex:1 1 auto;
+  }
+  .district-body::-webkit-scrollbar{ width:6px; }
+  .district-body::-webkit-scrollbar-thumb{ background:var(--border-hi); border-radius:10px; }
+
+  /* ---------- Company cards ---------- */
+  .card{
+    --cc:#57d5ee;
+    position:relative; display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:13px;
+    background:linear-gradient(155deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+    border:1px solid var(--border); cursor:pointer; transition:transform .25s cubic-bezier(.22,.85,.3,1.15), box-shadow .25s, border-color .25s, opacity .3s;
+    transform-origin:center;
+  }
+  .card:hover{
+    transform:scale(1.08); border-color:var(--cc); z-index:6;
+    box-shadow:0 0 0 1px color-mix(in srgb, var(--cc) 55%, transparent), 0 12px 28px -8px color-mix(in srgb, var(--cc) 70%, black), 0 0 22px -2px color-mix(in srgb, var(--cc) 50%, transparent);
+  }
+  .card.selected{
+    transform:scale(1.08); border-color:var(--cc); z-index:7;
+    box-shadow:0 0 0 1.5px var(--cc), 0 0 0 5px color-mix(in srgb, var(--cc) 18%, transparent), 0 14px 30px -8px color-mix(in srgb, var(--cc) 75%, black);
+  }
+  .card.faded{ opacity:.16; filter:saturate(.4); }
+  .card.dim{ opacity:.22; }
+  .card.tour-active{ animation:tourPulse 1.1s ease infinite; }
+  @keyframes tourPulse{
+    0%,100%{ box-shadow:0 0 0 1.5px var(--cc), 0 0 0 4px color-mix(in srgb, var(--cc) 25%, transparent); }
+    50%{ box-shadow:0 0 0 1.5px var(--cc), 0 0 0 9px color-mix(in srgb, var(--cc) 5%, transparent); }
+  }
+  .card-logo{
+    position:relative; width:34px; height:34px; border-radius:10px; flex:0 0 auto; overflow:hidden;
+    background:linear-gradient(135deg, var(--cc), color-mix(in srgb, var(--cc) 30%, #0a0e22));
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card-logo .fb{ font-family:var(--font-head); font-size:11.5px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.35); }
+  .card-logo img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#fff; padding:5px; opacity:0; transition:opacity .35s; }
+  .card-logo img.loaded{ opacity:1; }
+  .card-text{ min-width:0; flex:1; }
+  .card-name{ font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card-sub{ font-size:10.5px; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+  .card-transpak{ position:absolute; top:6px; right:6px; width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 6px var(--teal); }
+
+  /* ---------- Progress rail ---------- */
+  #rail{
+    position:absolute; left:0; right:0; bottom:0; height:34px; display:flex; align-items:center; justify-content:center;
+    gap:5px; z-index:35; pointer-events:none;
+  }
+  .rail-dot{
+    pointer-events:auto; width:7px; height:7px; border-radius:50%; background:var(--border-hi); cursor:pointer; transition:all .25s; position:relative;
+  }
+  .rail-dot.active{ width:22px; border-radius:5px; background:var(--dc,var(--cyan)); box-shadow:0 0 10px var(--dc,var(--cyan)); }
+  .rail-dot:hover::after{
+    content:attr(data-label); position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+    font-size:10px; color:var(--text); background:var(--bg2); border:1px solid var(--border); padding:3px 8px; border-radius:6px; white-space:nowrap;
+  }
+
+  /* ---------- Tour caption ---------- */
+  #tourCaption{
+    position:absolute; top:14px; left:50%; transform:translate(-50%,-14px); z-index:50; opacity:0; pointer-events:none;
+    background:var(--glass-hi); backdrop-filter:blur(20px); border:1px solid var(--border-hi); border-radius:14px;
+    padding:10px 20px; display:flex; align-items:center; gap:10px; transition:opacity .3s, transform .3s;
+    box-shadow:0 12px 30px -8px rgba(0,0,0,.5);
+  }
+  #tourCaption.show{ opacity:1; transform:translate(-50%,0); }
+  #tourCaption .tc-name{ font-family:var(--font-head); font-weight:700; font-size:14px; }
+  #tourCaption .tc-arrow{ color:var(--text-faint); }
+  #tourCaption .tc-role{ font-size:12px; color:var(--dc,var(--cyan)); font-weight:600; }
+  #tourCaption .tc-skip{ margin-left:8px; font-size:11px; color:var(--text-faint); cursor:pointer; border-left:1px solid var(--border); padding-left:10px; }
+  #tourCaption .tc-skip:hover{ color:var(--text); }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    position:absolute; top:64px; right:0; width:400px; max-width:92vw; height:calc(100% - 64px); z-index:35;
+    background:var(--glass-hi); backdrop-filter:blur(30px) saturate(160%); border-left:1px solid var(--border-hi);
+    transform:translateX(100%); transition:transform .32s cubic-bezier(.2,.85,.25,1); overflow-y:auto;
+    box-shadow:-30px 0 60px -20px rgba(0,0,0,.5);
+  }
+  #sidebar.open{ transform:translateX(0); }
+  #sb-close{
+    position:absolute; top:16px; right:16px; width:30px; height:30px; border-radius:9px; background:rgba(255,255,255,.06);
+    border:1px solid var(--border); color:var(--text-dim); cursor:pointer; font-size:16px; line-height:28px; text-align:center; z-index:2;
+  }
+  #sb-close:hover{ color:var(--text); border-color:var(--border-hi); }
+  #sidebar-content{ padding:26px 24px 40px; }
+  .sb-top{ display:flex; align-items:center; gap:13px; margin-bottom:16px; }
+  .sb-logo{ width:52px; height:52px; border-radius:14px; position:relative; overflow:hidden; flex:0 0 auto;
+    background:linear-gradient(135deg, var(--dc), color-mix(in srgb, var(--dc) 25%, #0a0e22)); display:flex; align-items:center; justify-content:center; }
+  .sb-logo .fb{ font-family:var(--font-head); font-weight:700; font-size:17px; color:#fff; }
+  .sb-logo img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#fff; padding:7px; opacity:0; transition:opacity .35s; }
+  .sb-logo img.loaded{ opacity:1; }
+  #sidebar h2{ font-family:var(--font-head); font-size:19px; font-weight:700; letter-spacing:-.01em; }
+  .sb-hq{ font-size:11.5px; color:var(--text-faint); margin-top:2px; }
+
+  .sb-position{ margin-bottom:18px; }
+  .sb-position-label{ font-size:11px; color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; gap:6px; font-weight:500; }
+  .sb-position-label b{ color:var(--dc); font-family:var(--font-head); }
+  .sb-track{ display:flex; align-items:center; gap:2px; }
+  .sb-tick{ flex:1; height:4px; border-radius:3px; background:var(--border); position:relative; }
+  .sb-tick.past{ background:color-mix(in srgb, var(--dc) 35%, var(--border)); }
+  .sb-tick.now{ background:var(--dc); box-shadow:0 0 8px var(--dc); }
+
+  .sb-badge{ display:inline-block; font-size:11px; padding:4px 10px; border-radius:999px; margin-bottom:12px; font-weight:600; border:1px solid; }
+  #sidebar .sb-desc{ font-size:13px; color:var(--text-dim); line-height:1.6; margin-bottom:18px; }
+
+  .sb-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+  .sb-metric{ background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:11px; padding:10px 12px; }
+  .sb-label{ font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); margin-bottom:4px; font-weight:600; }
+  .sb-val{ font-size:12.5px; color:var(--text); line-height:1.5; font-weight:500; }
+  .sb-section{ margin-bottom:18px; }
+  .sb-section-title{ font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); margin-bottom:8px; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .sb-section-title .n{ background:rgba(255,255,255,.06); padding:1px 6px; border-radius:8px; font-size:10px; color:var(--text-dim); }
+
+  .rel-item{ display:flex; align-items:center; gap:9px; padding:8px 9px; border-radius:10px; background:rgba(255,255,255,.035); border:1px solid var(--border); margin-bottom:6px; cursor:pointer; transition:all .15s; }
+  .rel-item:hover{ background:rgba(255,255,255,.07); border-color:var(--border-hi); transform:translateX(2px); }
+  .rel-dot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+  .rel-type{ font-size:9px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-faint); flex:0 0 auto; }
+  .rel-name{ color:var(--text); font-weight:600; font-size:12px; margin-left:auto; }
+
+  .sb-note{ background:rgba(255,255,255,.035); border:1px dashed var(--border-hi); border-radius:11px; padding:11px 12px; font-size:12px; color:var(--text-dim); font-style:italic; line-height:1.5; }
+  .sb-note.empty{ color:var(--text-faint); }
+
+  .sb-future{ display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:9px; background:rgba(255,255,255,.02); margin-bottom:5px; opacity:.55; }
+  .sb-future .lbl{ font-size:11.5px; color:var(--text-dim); }
+  .sb-future .soon{ font-size:8.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); border:1px solid var(--border); padding:1px 6px; border-radius:20px; }
+
+  .pill{ display:inline-block; font-size:10.5px; padding:3px 9px; border-radius:6px; background:rgba(255,255,255,.05); border:1px solid var(--border); color:var(--text-dim); margin:0 5px 5px 0; }
+
+  #empty-state{
+    position:absolute; bottom:44px; left:50%; transform:translateX(-50%); font-size:11.5px; color:var(--text-faint);
+    text-align:center; z-index:10; pointer-events:none; display:flex; gap:16px;
+  }
+  #empty-state span{ display:flex; align-items:center; gap:5px; }
+
+  @media (max-width:720px){
+    #searchWrap{ display:none; }
+    .district{ flex-basis:230px; }
+  }
+  /* END VISUAL/STYLE ZONE */
+</style>
+</head>
+<body>
+<!--
+  ============================================================
+  MARKUP ZONE — safe to restyle, rearrange, relabel
+  Do not remove element ids — the logic zone below looks
+  elements up by these exact ids.
+  ============================================================
+-->
+<div id="app">
+  <div id="topbar">
+    <div id="brand">
+      <div class="mark"></div>
+      <div>
+        <div class="name">AI <b>INFRASTRUCTURE ATLAS</b></div>
+        <div class="tag">Ecosystem Intelligence</div>
+      </div>
+    </div>
+    <div id="searchWrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="search" placeholder="Search companies, roles…">
+    </div>
+    <button class="btn primary" id="btn-tour">✦ Trace the AI supply chain</button>
+    <button class="btn" id="btn-transpak">TransPak lens</button>
+    <div id="topbar-right">
+      <span id="stats"></span>
+      <button class="btn" id="btn-theme">☾ Light</button>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <svg id="linksLayer"><defs></defs></svg>
+    <div id="districts"></div>
+    <div id="tourCaption">
+      <span class="tc-name" id="tc-name"></span>
+      <span class="tc-arrow">→</span>
+      <span class="tc-role" id="tc-role"></span>
+      <span class="tc-skip" id="tc-skip">Skip ⌫</span>
+    </div>
+    <div id="rail"></div>
+    <div id="empty-state">
+      <span>◆ click a company to inspect it</span>
+      <span>◆ hover to trace connections</span>
+      <span>◆ scroll to follow the supply chain →</span>
+    </div>
+  </div>
+
+  <aside id="sidebar">
+    <div id="sb-close">&times;</div>
+    <div id="sidebar-content"></div>
+  </aside>
+</div>
+
+<!--
+  ============================================================
+  LOGIC ZONE — DO NOT REBUILD FROM SCRATCH
+  Rendering engine: district layout, card generation, hover/
+  select relationship tracing (SVG overlay), sidebar rendering,
+  search/filter, TransPak lens, guided tour, theme toggle.
+
+  Safe to edit: DISTRICTS (colors/labels/order), COMPANIES and
+  EDGES data arrays (add/correct company data & relationships),
+  TOUR_SEQUENCE.
+
+  Do NOT restructure: layoutDistricts(), the ResizeObserver/
+  scroll listeners, drawLinks(), highlight(), openSidebar(),
+  or runTour() — they reference the markup ids above by name.
+
+  For deeper engine changes (new interactions, real backend
+  data, React/Flow migration) hand this file to Claude Code
+  rather than rebuilding it here.
+  ============================================================
+-->
+<script>
+"use strict";
+
+/* ---------- District taxonomy (left → right ecosystem flow) ---------- */
+var DISTRICTS = [
+  {key:"materials",       label:"Materials & Chemicals",        role:"Materials Layer",         sub:"Raw silicon, wafers & specialty gases",  color:"#57eed0"},
+  {key:"equipment",        label:"Semiconductor Equipment",      role:"Equipment Layer",         sub:"Lithography, etch & inspection tools",   color:"#57daee"},
+  {key:"design-software",  label:"Design Software",              role:"Design Software Layer",   sub:"EDA tools that design every chip",       color:"#57beee"},
+  {key:"fabrication",      label:"Chip Manufacturing",           role:"Fabrication Layer",       sub:"Foundries that fabricate silicon",       color:"#579bee"},
+  {key:"chip-designers",   label:"Chip Designers",               role:"Chip Design Layer",       sub:"GPU, CPU & AI accelerator architects",   color:"#5764ee"},
+  {key:"memory",           label:"Memory",                       role:"Memory Layer",            sub:"HBM, DRAM & NAND for AI accelerators",   color:"#7d57ee"},
+  {key:"networking",       label:"Networking & Interconnect",    role:"Networking Layer",        sub:"Switches, optics & cluster interconnect",color:"#af57ee"},
+  {key:"server-oems",      label:"Server OEMs",                  role:"Server OEM Layer",        sub:"Branded AI server & rack systems",       color:"#c257ee"},
+  {key:"odms",             label:"ODMs / Contract Mfrs",         role:"ODM / Contract Mfg Layer",sub:"Builds servers at hyperscale for cloud", color:"#da57ee"},
+  {key:"power-cooling",    label:"Power & Cooling",               role:"Power & Cooling Layer",   sub:"Energy & thermal systems for AI DCs",    color:"#ee9e57"},
+  {key:"data-centers",     label:"Data Centers",                 role:"Data Center Layer",       sub:"Colocation housing AI infrastructure",   color:"#eec157"},
+  {key:"cloud",            label:"Cloud Providers / Hyperscalers",role:"Cloud Layer",             sub:"Rent out AI compute at global scale",    color:"#57d5ee"},
+  {key:"ai-companies",     label:"AI Companies",                 role:"AI Model Layer",          sub:"Foundation model labs consuming it all", color:"#ee57ad"}
+];
+var DISTRICT_BY_KEY = {}; DISTRICTS.forEach(function(d,i){ d.order=i; DISTRICT_BY_KEY[d.key]=d; });
+
+var RELATION_STYLES = {
+  "Manufactures for": {label:"manufactures for", reverse:"used by",       color:"#5764ee"},
+  "Supplies":         {label:"supplies",         reverse:"supplied by",   color:"#57eed0"},
+  "Sells to":         {label:"sells to",         reverse:"buys from",     color:"#57d5ee"},
+  "Competes with":    {label:"competes with",    reverse:"competes with", color:"#8a90ab"},
+  "Partners with":    {label:"partners with",    reverse:"partners with", color:"#af57ee"},
+  "Invests in":       {label:"invests in",       reverse:"invested in by",color:"#eec157"},
+  "Owns":             {label:"owns",              reverse:"owned by",      color:"#ee57ad"}
+};
+
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, function(ch){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+
+/* ---------- Data ---------- */
+/* Source of truth: Industry_Ecosystem_Tracker.xlsx, merged with the V1 prototype's
+   long-form descriptions. See CLAUDE.md for provenance and the target architecture. */
+var COMPANIES = [{"id":"NVIDIA","district":"chip-designers","sub":"GPU Designer","make":"AI GPUs","desc":"Designs the GPUs that power almost all large-scale AI training and inference.","customers":"Microsoft, Amazon, Meta","revenue":"GPU sales","ai":"Very High","transpak":"Yes","connection":"Core AI compute provider","notes":"","hq":"Santa Clara, CA","size":"Mega-cap","domain":"nvidia.com"},{"id":"AMD","district":"chip-designers","sub":"CPU/GPU Designer","make":"CPUs, GPUs, APUs","desc":"Designs CPUs, GPUs and APUs; NVIDIA's primary AI-accelerator rival.","customers":"Cloud providers, Enterprises","revenue":"Chip sales","ai":"Very High","transpak":"No","connection":"Alternative AI compute","notes":"","hq":"Santa Clara, CA","size":"Large-cap","domain":"amd.com"},{"id":"Intel","district":"chip-designers","sub":"CPU Designer","make":"CPUs, Server chips","desc":"Legacy CPU leader now building AI accelerators and its own foundry business.","customers":"OEMs, Enterprises","revenue":"Chip sales","ai":"High","transpak":"No","connection":"Legacy compute, AI catch-up","notes":"","hq":"Santa Clara, CA","size":"Large-cap","domain":"intel.com"},{"id":"Broadcom","district":"chip-designers","sub":"Custom Chips","make":"Custom ASICs, Networking chips","desc":"Builds custom AI ASICs and networking silicon for hyperscalers.","customers":"Hyperscalers, Enterprises","revenue":"Chip sales","ai":"Very High","transpak":"No","connection":"Custom AI accelerators","notes":"","hq":"Palo Alto, CA","size":"Mega-cap","domain":"broadcom.com"},{"id":"Marvell","district":"chip-designers","sub":"Data Infrastructure","make":"Custom silicon, Storage controllers","desc":"Custom silicon and storage/connectivity controllers for cloud data centers.","customers":"Cloud providers","revenue":"Chip sales","ai":"High","transpak":"TBD","connection":"Data center connectivity","notes":"","hq":"Santa Clara, CA","size":"Large-cap","domain":"marvell.com"},{"id":"Qualcomm","district":"chip-designers","sub":"Mobile/AI Chips","make":"Mobile processors, AI chips","desc":"Mobile processors and edge AI chips for phones and PCs.","customers":"Phone OEMs, PCs","revenue":"Chip sales","ai":"High","transpak":"TBD","connection":"Edge AI processing","notes":"","hq":"San Diego, CA","size":"Large-cap","domain":"qualcomm.com"},{"id":"TSMC","district":"fabrication","sub":"Foundry","make":"Chip fabrication","desc":"World's leading contract chip fabricator; manufactures nearly all leading-edge AI silicon.","customers":"NVIDIA, AMD, Apple","revenue":"Wafer production","ai":"Very High","transpak":"TBD","connection":"Manufactures leading-edge chips","notes":"","hq":"Hsinchu, Taiwan","size":"Mega-cap","domain":"tsmc.com"},{"id":"Samsung","district":"fabrication","sub":"Foundry/Memory","make":"Memory, Chip fabrication","desc":"Memory manufacturer and foundry; produces HBM memory critical to AI accelerators.","customers":"Various OEMs","revenue":"Memory & Wafer production","ai":"Very High","transpak":"TBD","connection":"HBM memory for AI","notes":"","hq":"Suwon, South Korea","size":"Mega-cap","domain":"samsung.com"},{"id":"ASML","district":"equipment","sub":"Lithography Equipment","make":"EUV machines","desc":"Sole global supplier of EUV lithography machines needed for leading-edge chips.","customers":"TSMC, Samsung, Intel","revenue":"Equipment sales","ai":"Very High","transpak":"TBD","connection":"Enables advanced chip manufacturing","notes":"","hq":"Veldhoven, Netherlands","size":"Mega-cap","domain":"asml.com"},{"id":"Applied Materials","district":"equipment","sub":"Fab Equipment","make":"Deposition, Etch systems","desc":"Deposition and etch systems used across chip fabrication.","customers":"Foundries, IDMs","revenue":"Equipment sales","ai":"Very High","transpak":"TBD","connection":"Chip manufacturing equipment","notes":"","hq":"Santa Clara, CA","size":"Large-cap","domain":"appliedmaterials.com"},{"id":"Lam Research","district":"equipment","sub":"Fab Equipment","make":"Etch, Deposition systems","desc":"Etch and deposition equipment for semiconductor fabs.","customers":"Foundries, IDMs","revenue":"Equipment sales","ai":"Very High","transpak":"TBD","connection":"Chip manufacturing equipment","notes":"","hq":"Fremont, CA","size":"Large-cap","domain":"lamresearch.com"},{"id":"KLA","district":"equipment","sub":"Inspection Equipment","make":"Metrology, Inspection","desc":"Metrology and inspection systems that drive fab yield optimization.","customers":"Foundries, IDMs","revenue":"Equipment sales","ai":"Very High","transpak":"TBD","connection":"Yield optimization equipment","notes":"","hq":"Milpitas, CA","size":"Large-cap","domain":"kla.com"},{"id":"Dell","district":"server-oems","sub":"Server OEM","make":"Servers, Storage, PCs","desc":"Builds enterprise servers, storage and AI infrastructure hardware.","customers":"Enterprises, Cloud","revenue":"Hardware sales","ai":"High","transpak":"TBD","connection":"Enterprise AI infrastructure","notes":"","hq":"Round Rock, TX","size":"Large-cap","domain":"dell.com"},{"id":"HPE","district":"server-oems","sub":"Server OEM","make":"Servers, Storage","desc":"Enterprise servers and storage, growing AI server business.","customers":"Enterprises","revenue":"Hardware sales","ai":"High","transpak":"TBD","connection":"Enterprise AI servers","notes":"","hq":"Spring, TX","size":"Mid-cap","domain":"hpe.com"},{"id":"Supermicro","district":"server-oems","sub":"AI Servers","make":"Servers & racks","desc":"Specializes in high-density AI server and rack systems for cloud providers.","customers":"Cloud providers","revenue":"Server sales","ai":"Very High","transpak":"Yes","connection":"Builds AI systems","notes":"","hq":"San Jose, CA","size":"Mid-cap","domain":"supermicro.com"},{"id":"Cisco","district":"networking","sub":"Networking","make":"Switches, Routers","desc":"Switches and routers underpinning enterprise and data center networks.","customers":"Enterprises, Telcos","revenue":"Networking sales","ai":"Medium","transpak":"TBD","connection":"Data center networking","notes":"","hq":"San Jose, CA","size":"Large-cap","domain":"cisco.com"},{"id":"Arista","district":"networking","sub":"Data Center Networking","make":"High-speed switches","desc":"High-speed switches purpose-built for AI cluster networking.","customers":"Cloud providers, Enterprises","revenue":"Switch sales","ai":"High","transpak":"TBD","connection":"AI cluster networking","notes":"","hq":"Santa Clara, CA","size":"Large-cap","domain":"arista.com"},{"id":"Jabil","district":"odms","sub":"EMS","make":"Electronic manufacturing","desc":"Electronics manufacturing services for tech OEMs across industries.","customers":"OEMs across industries","revenue":"Manufacturing services","ai":"High","transpak":"Yes","connection":"Builds for tech customers","notes":"","hq":"St. Petersburg, FL","size":"Mid-cap","domain":"jabil.com"},{"id":"Flex","district":"odms","sub":"EMS","make":"Electronic manufacturing","desc":"Global electronics manufacturer serving diverse OEM customers.","customers":"OEMs across industries","revenue":"Manufacturing services","ai":"High","transpak":"TBD","connection":"Builds for tech customers","notes":"","hq":"San Jose, CA","size":"Mid-cap","domain":"flex.com"},{"id":"Celestica","district":"odms","sub":"EMS","make":"Electronic manufacturing","desc":"Contract manufacturer with growing hyperscaler server business.","customers":"OEMs, Cloud providers","revenue":"Manufacturing services","ai":"High","transpak":"TBD","connection":"Server manufacturing","notes":"","hq":"Toronto, Canada","size":"Mid-cap","domain":"celestica.com"},{"id":"Sanmina","district":"odms","sub":"EMS","make":"Electronic manufacturing","desc":"Electronics manufacturing services provider building complex systems for communications, cloud and industrial OEMs.","customers":"OEMs across industries","revenue":"Manufacturing services","ai":"Medium","transpak":"TBD","connection":"Builds for tech customers","notes":"","hq":"San Jose, CA","size":"Mid-cap","domain":"sanmina.com"},{"id":"Foxconn","district":"odms","sub":"ODM/EMS","make":"Electronics assembly","desc":"World's largest electronics assembler; major AI server builder.","customers":"Apple, Tech OEMs","revenue":"Manufacturing services","ai":"High","transpak":"TBD","connection":"Major tech manufacturer","notes":"","hq":"New Taipei City, Taiwan","size":"Large-cap","domain":"foxconn.com"},{"id":"Quanta","district":"odms","sub":"ODM","make":"Servers, Notebooks","desc":"Leading ODM building servers and notebooks for cloud providers.","customers":"Cloud providers, OEMs","revenue":"Manufacturing services","ai":"Very High","transpak":"TBD","connection":"Cloud server ODM","notes":"","hq":"Taoyuan, Taiwan","size":"Mid-cap","domain":"quantatw.com"},{"id":"Inventec","district":"odms","sub":"ODM","make":"Servers, Notebooks","desc":"Taiwanese ODM building servers and notebooks, with a growing AI server line for hyperscale customers.","customers":"Cloud providers, OEMs","revenue":"Manufacturing services","ai":"High","transpak":"TBD","connection":"Server manufacturing","notes":"","hq":"Taipei, Taiwan","size":"Mid-cap","domain":"inventec.com"},{"id":"Wiwynn","district":"odms","sub":"ODM","make":"Servers. Rack Systems","desc":"Rack-scale server systems ODM tightly tied to hyperscaler build cycles.","customers":"Cloud providers, hyperscalers","revenue":"Manufacturing services","ai":"Very High","transpak":"Yes","connection":"Rack-scale server systems ODM tightly tied to hyperscaler build cycles.","notes":"","hq":"Taipei, Taiwan","size":"Mid-cap","domain":"wiwynn.com"},{"id":"Wistron","district":"odms","sub":"ODM","make":"Servers, PCs","desc":"Taiwanese ODM manufacturing servers and PCs, including GPU server platforms for cloud customers.","customers":"Cloud providers, OEMs","revenue":"Manufacturing services","ai":"High","transpak":"TBD","connection":"Server manufacturing","notes":"","hq":"New Taipei City, Taiwan","size":"Mid-cap","domain":"wistron.com"},{"id":"Microsoft","district":"cloud","sub":"Azure","make":"Cloud services","desc":"Cloud platform and major AI infrastructure operator; primary OpenAI partner.","customers":"Businesses","revenue":"Cloud consumption","ai":"Very High","transpak":"Yes","connection":"AI infrastructure operator","notes":"","hq":"Redmond, WA","size":"Mega-cap","domain":"microsoft.com"},{"id":"Amazon","district":"cloud","sub":"AWS","make":"Cloud services","desc":"Largest cloud provider by revenue; heavy AI infrastructure investment.","customers":"Businesses","revenue":"Cloud consumption","ai":"Very High","transpak":"Yes","connection":"AI infrastructure operator","notes":"","hq":"Seattle, WA","size":"Mega-cap","domain":"amazon.com"},{"id":"Google","district":"cloud","sub":"GCP","make":"Cloud services","desc":"Cloud platform and in-house AI research; builds custom TPU silicon.","customers":"Businesses","revenue":"Cloud consumption","ai":"Very High","transpak":"Yes","connection":"AI infrastructure operator","notes":"","hq":"Mountain View, CA","size":"Mega-cap","domain":"google.com"},{"id":"Oracle","district":"cloud","sub":"OCI","make":"Cloud services, Database","desc":"Enterprise cloud and database provider expanding rapidly into AI compute.","customers":"Enterprises","revenue":"Cloud consumption","ai":"High","transpak":"Yes","connection":"Growing AI cloud","notes":"","hq":"Austin, TX","size":"Large-cap","domain":"oracle.com"},{"id":"Meta","district":"cloud","sub":"AI Infrastructure","make":"AI models, Social platforms","desc":"Builds massive internal AI infrastructure to power its models and platforms.","customers":"Consumers, Advertisers","revenue":"Advertising, AI research","ai":"Very High","transpak":"Yes","connection":"Massive AI infrastructure","notes":"","hq":"Menlo Park, CA","size":"Mega-cap","domain":"meta.com"},{"id":"Equinix","district":"data-centers","sub":"Colocation","make":"Data center space","desc":"Global colocation provider housing cloud and AI infrastructure.","customers":"Enterprises, Cloud","revenue":"Colocation services","ai":"High","transpak":"TBD","connection":"Houses AI infrastructure","notes":"","hq":"Redwood City, CA","size":"Large-cap","domain":"equinix.com"},{"id":"Digital Realty","district":"data-centers","sub":"Colocation","make":"Data center space","desc":"Data center REIT providing colocation space for AI workloads.","customers":"Enterprises, Cloud","revenue":"Colocation services","ai":"High","transpak":"TBD","connection":"Houses AI infrastructure","notes":"","hq":"Austin, TX","size":"Large-cap","domain":"digitalrealty.com"},{"id":"CyrusOne","district":"data-centers","sub":"Colocation","make":"Data center space","desc":"Data center operator serving hyperscale and enterprise AI demand.","customers":"Enterprises, Cloud","revenue":"Colocation services","ai":"High","transpak":"TBD","connection":"Houses AI infrastructure","notes":"","hq":"Dallas, TX","size":"Private","domain":"cyrusone.com"},{"id":"Vistra","district":"power-cooling","sub":"Power Generation","make":"Electricity generation (gas, nuclear, solar)","desc":"Power generator supplying electricity to data center operators.","customers":"Utilities, Data center operators","revenue":"Power sales","ai":"High","transpak":"TBD","connection":"Powers AI data centers","notes":"","hq":"Irving, TX","size":"Large-cap","domain":"vistracorp.com"},{"id":"Constellation Energy","district":"power-cooling","sub":"Power Generation","make":"Nuclear & clean power generation","desc":"Nuclear and clean power generator signing direct deals with hyperscalers.","customers":"Utilities, Hyperscalers","revenue":"Power sales","ai":"High","transpak":"TBD","connection":"Nuclear power for AI data centers","notes":"Signed deal to restart Three Mile Island for Microsoft","hq":"Baltimore, MD","size":"Large-cap","domain":"constellationenergy.com"},{"id":"NextEra Energy","district":"power-cooling","sub":"Power Generation","make":"Renewable power, grid infrastructure","desc":"Largest US renewable power producer, increasingly contracting directly with data center operators.","customers":"Utilities, Enterprises","revenue":"Power sales","ai":"Medium","transpak":"TBD","connection":"Renewable power for data centers","notes":"","hq":"Juno Beach, FL","size":"Mega-cap","domain":"nexteraenergy.com"},{"id":"GE Vernova","district":"power-cooling","sub":"Power Equipment","make":"Gas turbines, grid equipment","desc":"Builds the gas turbines and grid equipment utilities need to meet AI-driven power demand growth.","customers":"Utilities, Power producers","revenue":"Equipment sales","ai":"High","transpak":"TBD","connection":"Turbines powering AI-driven demand growth","notes":"","hq":"Cambridge, MA","size":"Large-cap","domain":"gevernova.com"},{"id":"Vertiv","district":"power-cooling","sub":"Data Center Power/Cooling","make":"Power management, thermal management systems","desc":"Critical power management and thermal systems for AI data centers.","customers":"Data center operators, Hyperscalers","revenue":"Equipment sales","ai":"Very High","transpak":"TBD","connection":"Critical power/cooling infra for AI data centers","notes":"Heavy specialized equipment, high shipping relevance","hq":"Westerville, OH","size":"Large-cap","domain":"vertiv.com"},{"id":"Schneider Electric","district":"power-cooling","sub":"Data Center Power","make":"Power distribution, UPS systems","desc":"Power distribution and UPS systems for data center infrastructure.","customers":"Data center operators, Enterprises","revenue":"Equipment sales","ai":"High","transpak":"TBD","connection":"Power infrastructure for AI data centers","notes":"","hq":"Rueil-Malmaison, France","size":"Mega-cap","domain":"se.com"},{"id":"Micron","district":"memory","sub":"Memory Manufacturer","make":"DRAM, NAND, HBM","desc":"Major US memory manufacturer, key HBM supplier for AI accelerators.","customers":"Cloud providers, OEMs","revenue":"Memory sales","ai":"Very High","transpak":"TBD","connection":"HBM memory for AI accelerators","notes":"Major US-based memory supplier","hq":"Boise, ID","size":"Large-cap","domain":"micron.com"},{"id":"SK Hynix","district":"memory","sub":"Memory Manufacturer","make":"DRAM, NAND, HBM","desc":"Leading HBM memory supplier, tightly coupled to NVIDIA's GPU roadmap.","customers":"NVIDIA, Cloud providers","revenue":"Memory sales","ai":"Very High","transpak":"TBD","connection":"Leading HBM supplier for NVIDIA GPUs","notes":"","hq":"Icheon, South Korea","size":"Large-cap","domain":"skhynix.com"},{"id":"Kioxia","district":"memory","sub":"Memory Manufacturer","make":"NAND flash storage","desc":"NAND flash memory manufacturer spun out of Toshiba, supplying storage for AI systems.","customers":"OEMs, Enterprises","revenue":"Memory sales","ai":"Medium","transpak":"TBD","connection":"Flash storage for AI systems","notes":"","hq":"Tokyo, Japan","size":"Large-cap","domain":"kioxia.com"},{"id":"Coherent","district":"networking","sub":"Optical Components","make":"Optical transceivers, lasers","desc":"Optical transceivers and lasers used in AI cluster interconnects.","customers":"Cloud providers, Networking OEMs","revenue":"Component sales","ai":"High","transpak":"TBD","connection":"Optical links for AI clusters","notes":"","hq":"Saxonburg, PA","size":"Mid-cap","domain":"coherent.com"},{"id":"Lumentum","district":"networking","sub":"Optical Components","make":"Optical transceivers, photonics","desc":"Photonics and optical components for high-speed data center links.","customers":"Cloud providers, Networking OEMs","revenue":"Component sales","ai":"High","transpak":"TBD","connection":"High-speed optical interconnect for AI","notes":"","hq":"San Jose, CA","size":"Mid-cap","domain":"lumentum.com"},{"id":"Astera Labs","district":"networking","sub":"Connectivity Chips","make":"PCIe/CXL connectivity chips","desc":"PCIe/CXL connectivity chips enabling AI server rack architectures.","customers":"Cloud providers, Server OEMs","revenue":"Chip sales","ai":"Very High","transpak":"TBD","connection":"Connectivity for AI server racks","notes":"","hq":"Santa Clara, CA","size":"Mid-cap","domain":"asteralabs.com"},{"id":"Credo Technology","district":"networking","sub":"Connectivity Chips","make":"High-speed SerDes, active electrical cables","desc":"High-speed SerDes chips and active electrical cables for AI cluster interconnects.","customers":"Cloud providers, Networking OEMs","revenue":"Chip sales","ai":"High","transpak":"TBD","connection":"AI cluster interconnect","notes":"","hq":"San Jose, CA","size":"Mid-cap","domain":"credosemi.com"},{"id":"Ciena","district":"networking","sub":"Optical Networking","make":"Optical networking systems","desc":"Optical networking systems that carry AI data traffic across telecom and cloud backbones.","customers":"Telcos, Cloud providers","revenue":"Equipment sales","ai":"Medium","transpak":"TBD","connection":"Backbone networking for AI data traffic","notes":"","hq":"Hanover, MD","size":"Large-cap","domain":"ciena.com"},{"id":"Shin-Etsu Chemical","district":"materials","sub":"Silicon Wafers","make":"Silicon wafers, materials","desc":"Major silicon wafer and specialty materials supplier for chipmaking.","customers":"Foundries, IDMs","revenue":"Materials sales","ai":"High","transpak":"TBD","connection":"Upstream input for chip fabrication","notes":"","hq":"Tokyo, Japan","size":"Large-cap","domain":"shinetsu.co.jp"},{"id":"SUMCO","district":"materials","sub":"Silicon Wafers","make":"Silicon wafers","desc":"Silicon wafer manufacturer supplying the global foundry industry.","customers":"Foundries, IDMs","revenue":"Materials sales","ai":"High","transpak":"TBD","connection":"Upstream input for chip fabrication","notes":"","hq":"Tokyo, Japan","size":"Mid-cap","domain":"sumcocorp.com"},{"id":"Air Products","district":"materials","sub":"Specialty Gases","make":"Industrial & specialty gases for fabs","desc":"Industrial gas supplier providing specialty gases used throughout chip fabrication.","customers":"Foundries, IDMs","revenue":"Gas sales","ai":"Medium","transpak":"TBD","connection":"Supplies gases used in chip fabrication","notes":"","hq":"Allentown, PA","size":"Large-cap","domain":"airproducts.com"},{"id":"Linde","district":"materials","sub":"Specialty Gases","make":"Industrial & specialty gases for fabs","desc":"Industrial gas company supplying the ultra-pure gases fabs need for etching and deposition.","customers":"Foundries, IDMs","revenue":"Gas sales","ai":"Medium","transpak":"TBD","connection":"Supplies gases used in chip fabrication","notes":"","hq":"Woking, United Kingdom","size":"Mega-cap","domain":"linde.com"},{"id":"OpenAI","district":"ai-companies","sub":"Foundation Models","make":"LLMs, AI products (ChatGPT)","desc":"Creator of ChatGPT and GPT models; deeply tied to Microsoft's Azure infrastructure.","customers":"Consumers, Enterprises, Developers","revenue":"Subscription, API revenue","ai":"Very High","transpak":"TBD","connection":"Drives massive cloud/GPU demand","notes":"","hq":"San Francisco, CA","size":"Private","domain":"openai.com"},{"id":"Anthropic","district":"ai-companies","sub":"Foundation Models","make":"LLMs, AI products (Claude)","desc":"Builds the Claude family of models; backed by Amazon and Google cloud infrastructure.","customers":"Consumers, Enterprises, Developers","revenue":"Subscription, API revenue","ai":"Very High","transpak":"TBD","connection":"Drives cloud/GPU demand","notes":"","hq":"San Francisco, CA","size":"Private","domain":"anthropic.com"},{"id":"xAI","district":"ai-companies","sub":"Foundation Models","make":"LLMs, AI products (Grok)","desc":"Builds the Grok models and operates its own large-scale GPU compute cluster.","customers":"Consumers, Enterprises, Developers","revenue":"Subscription, API revenue","ai":"Very High","transpak":"TBD","connection":"Drives GPU/data center demand","notes":"","hq":"San Francisco, CA","size":"Private","domain":"x.ai"},{"id":"Mistral AI","district":"ai-companies","sub":"Foundation Models","make":"Open & commercial LLMs","desc":"French foundation model lab building open-weight and commercial LLMs, Europe's leading AI compute demand driver.","customers":"Enterprises, Developers","revenue":"API, licensing revenue","ai":"High","transpak":"TBD","connection":"European AI compute demand driver","notes":"","hq":"Paris, France","size":"Private","domain":"mistral.ai"},{"id":"DeepSeek","district":"ai-companies","sub":"Foundation Models","make":"Open-source LLMs","desc":"Chinese AI lab building efficient open-source LLMs that have reshaped assumptions about training compute costs.","customers":"Developers, Enterprises","revenue":"Limited/emerging monetization","ai":"High","transpak":"TBD","connection":"China-based AI compute demand driver","notes":"","hq":"Hangzhou, China","size":"Private","domain":"deepseek.com"},{"id":"CoolIT Systems","district":"power-cooling","sub":"Liquid Cooling","make":"Direct liquid cooling systems","desc":"Direct liquid cooling systems for high-density AI server racks.","customers":"Server OEMs, Data center operators","revenue":"Equipment sales","ai":"High","transpak":"TBD","connection":"Liquid cooling for high-density AI racks","notes":"Bulky specialized equipment, shipping-relevant","hq":"Calgary, Canada","size":"Private","domain":"coolitsystems.com"},{"id":"Boyd","district":"power-cooling","sub":"Thermal Management","make":"Thermal management components","desc":"Thermal management and gasketing components used inside AI servers and data center hardware.","customers":"Server OEMs, Data center operators","revenue":"Equipment sales","ai":"Medium","transpak":"TBD","connection":"Thermal solutions for AI hardware","notes":"","hq":"Lakeville, MN","size":"Private","domain":"boydcorp.com"},{"id":"LiquidStack","district":"power-cooling","sub":"Immersion Cooling","make":"Immersion cooling systems","desc":"Immersion cooling systems that submerge AI servers in dielectric fluid for extreme density.","customers":"Data center operators, Cloud providers","revenue":"Equipment sales","ai":"High","transpak":"TBD","connection":"Immersion cooling for AI data centers","notes":"Bulky specialized equipment, shipping-relevant","hq":"Chicago, IL","size":"Private","domain":"liquidstack.com"},{"id":"Synopsys","district":"design-software","sub":"EDA Software","make":"Chip design & simulation software","desc":"Chip design and simulation software used to design almost all modern silicon.","customers":"Semiconductor companies","revenue":"Software licensing","ai":"High","transpak":"TBD","connection":"Enables chip design for all AI silicon","notes":"","hq":"Sunnyvale, CA","size":"Large-cap","domain":"synopsys.com"},{"id":"Cadence","district":"design-software","sub":"EDA Software","make":"Chip design & simulation software","desc":"Chip design and simulation software, Synopsys's primary EDA rival.","customers":"Semiconductor companies","revenue":"Software licensing","ai":"High","transpak":"TBD","connection":"Enables chip design for all AI silicon","notes":"","hq":"San Jose, CA","size":"Large-cap","domain":"cadence.com"},{"id":"Cerebras Systems","district":"chip-designers","sub":"Wafer-Scale AI Chips","make":"Wafer-scale AI accelerator chips","desc":"Builds wafer-scale AI accelerator chips as an alternative to NVIDIA GPUs.","customers":"Enterprises, Research labs","revenue":"Hardware/system sales","ai":"Very High","transpak":"TBD","connection":"Alternative AI compute architecture","notes":"","hq":"Sunnyvale, CA","size":"Private","domain":"cerebras.net"},{"id":"Groq","district":"chip-designers","sub":"AI Inference Chips","make":"LPU inference chips","desc":"Builds LPU chips optimized for very fast AI inference.","customers":"Enterprises, Cloud providers","revenue":"Hardware/system sales","ai":"Very High","transpak":"TBD","connection":"Fast AI inference compute","notes":"","hq":"Mountain View, CA","size":"Private","domain":"groq.com"}];
+var EDGES = [["Shin-Etsu Chemical","TSMC","Supplies"],["SUMCO","TSMC","Supplies"],["Air Products","TSMC","Supplies"],["Linde","TSMC","Supplies"],["Air Products","Samsung","Supplies"],["Linde","Samsung","Supplies"],["Shin-Etsu Chemical","Samsung","Supplies"],["SUMCO","Samsung","Supplies"],["ASML","TSMC","Supplies"],["ASML","Samsung","Supplies"],["Applied Materials","TSMC","Supplies"],["Lam Research","TSMC","Supplies"],["KLA","TSMC","Supplies"],["Applied Materials","Samsung","Supplies"],["Lam Research","Samsung","Supplies"],["KLA","Samsung","Supplies"],["Synopsys","NVIDIA","Sells to"],["Cadence","NVIDIA","Sells to"],["Synopsys","AMD","Sells to"],["Cadence","Broadcom","Sells to"],["Synopsys","Broadcom","Sells to"],["Cadence","AMD","Sells to"],["Synopsys","Cadence","Competes with"],["TSMC","NVIDIA","Manufactures for"],["TSMC","AMD","Manufactures for"],["TSMC","Qualcomm","Manufactures for"],["TSMC","Broadcom","Manufactures for"],["TSMC","Marvell","Manufactures for"],["TSMC","Cerebras Systems","Manufactures for"],["TSMC","Groq","Manufactures for"],["Samsung","Qualcomm","Manufactures for"],["Samsung","TSMC","Competes with"],["Intel","TSMC","Competes with"],["SK Hynix","NVIDIA","Sells to"],["Micron","NVIDIA","Sells to"],["Kioxia","Dell","Sells to"],["Micron","Dell","Sells to"],["SK Hynix","Micron","Competes with"],["Samsung","SK Hynix","Competes with"],["Samsung","Kioxia","Competes with"],["Kioxia","SK Hynix","Competes with"],["NVIDIA","AMD","Competes with"],["AMD","Intel","Competes with"],["NVIDIA","Cerebras Systems","Competes with"],["NVIDIA","Groq","Competes with"],["Groq","Cerebras Systems","Competes with"],["Astera Labs","NVIDIA","Sells to"],["Coherent","Microsoft","Sells to"],["Lumentum","Amazon","Sells to"],["Credo Technology","Amazon","Sells to"],["Credo Technology","Microsoft","Sells to"],["Ciena","Google","Sells to"],["Arista","Meta","Sells to"],["Arista","Cisco","Competes with"],["NVIDIA","Dell","Sells to"],["NVIDIA","HPE","Sells to"],["NVIDIA","Supermicro","Sells to"],["NVIDIA","Quanta","Sells to"],["NVIDIA","Foxconn","Sells to"],["NVIDIA","Wiwynn","Sells to"],["NVIDIA","Inventec","Sells to"],["NVIDIA","Wistron","Sells to"],["AMD","Dell","Sells to"],["Quanta","Microsoft","Manufactures for"],["Wiwynn","Meta","Manufactures for"],["Foxconn","Google","Manufactures for"],["Celestica","Amazon","Manufactures for"],["Jabil","Cisco","Manufactures for"],["Flex","HPE","Manufactures for"],["Sanmina","Cisco","Manufactures for"],["Inventec","Microsoft","Manufactures for"],["Wistron","Google","Manufactures for"],["Supermicro","Microsoft","Sells to"],["Supermicro","Amazon","Sells to"],["Dell","Oracle","Sells to"],["Cisco","Equinix","Sells to"],["Vistra","Equinix","Supplies"],["Constellation Energy","Microsoft","Supplies"],["NextEra Energy","Digital Realty","Supplies"],["GE Vernova","Vistra","Supplies"],["GE Vernova","Constellation Energy","Supplies"],["Vertiv","Digital Realty","Supplies"],["Schneider Electric","Equinix","Supplies"],["CoolIT Systems","Supermicro","Supplies"],["Boyd","Supermicro","Supplies"],["LiquidStack","CyrusOne","Supplies"],["Vertiv","Schneider Electric","Competes with"],["CoolIT Systems","LiquidStack","Competes with"],["Equinix","Amazon","Supplies"],["Digital Realty","Oracle","Supplies"],["CyrusOne","Meta","Supplies"],["Microsoft","OpenAI","Invests in"],["Microsoft","OpenAI","Partners with"],["Amazon","Anthropic","Invests in"],["Google","Anthropic","Invests in"],["Amazon","Anthropic","Partners with"],["Google","Mistral AI","Invests in"],["xAI","OpenAI","Competes with"],["xAI","Anthropic","Competes with"],["OpenAI","Anthropic","Competes with"],["Meta","OpenAI","Competes with"],["Mistral AI","OpenAI","Competes with"],["DeepSeek","OpenAI","Competes with"],["DeepSeek","Mistral AI","Competes with"]];
+
+var TOUR_SEQUENCE = ["ASML","TSMC","NVIDIA","Supermicro","Microsoft","OpenAI"];
+
+/* ---------- Derived indexes ---------- */
+var byId = {}; COMPANIES.forEach(function(c){ byId[c.id]=c; });
+var edgesByCompany = {};
+EDGES.forEach(function(e){
+  edgesByCompany[e[0]] = edgesByCompany[e[0]] || [];
+  edgesByCompany[e[0]].push({to:e[1], type:e[2], dir:"out"});
+  edgesByCompany[e[1]] = edgesByCompany[e[1]] || [];
+  edgesByCompany[e[1]].push({to:e[0], type:e[2], dir:"in"});
+});
+var byDistrict = {};
+COMPANIES.forEach(function(c){ (byDistrict[c.district]=byDistrict[c.district]||[]).push(c); });
+
+function initials(name){
+  var words = name.replace(/\(.*?\)/g,"").trim().split(/\s+/);
+  if(words.length===1) return words[0].slice(0,2).toUpperCase();
+  return (words[0][0]+words[1][0]).toUpperCase();
+}
+function logoUrl(domain){ return "https://logo.clearbit.com/"+domain+"?size=128"; }
+
+/* ---------- Render: districts + cards ---------- */
+var districtsEl = document.getElementById("districts");
+var railEl = document.getElementById("rail");
+
+function cardHtml(c){
+  var d = DISTRICT_BY_KEY[c.district];
+  return (
+    '<div class="card" data-id="'+esc(c.id)+'" style="--cc:'+d.color+'">'+
+      '<div class="card-logo">'+
+        '<span class="fb">'+esc(initials(c.id))+'</span>'+
+        '<img loading="lazy" src="'+logoUrl(c.domain)+'" alt="" onload="this.classList.add(\'loaded\')" onerror="this.remove()">'+
+      '</div>'+
+      '<div class="card-text">'+
+        '<div class="card-name">'+esc(c.id)+'</div>'+
+        '<div class="card-sub">'+esc(c.sub)+'</div>'+
+      '</div>'+
+      (c.transpak==='Yes' ? '<div class="card-transpak" title="TransPak customer"></div>' : '')+
+    '</div>'
+  );
+}
+
+function buildDistricts(){
+  var frag = document.createDocumentFragment();
+  DISTRICTS.forEach(function(d, i){
+    if(i>0){
+      var arrow = document.createElement('div');
+      arrow.className = 'flow-arrow';
+      arrow.style.setProperty('--district-c', d.color);
+      arrow.innerHTML = '<svg viewBox="0 0 30 16"><path class="chev" d="M2 2 L14 8 L2 14"/><path class="chev" d="M10 2 L22 8 L10 14"/><path class="chev" d="M18 2 L30 8 L18 14"/></svg>';
+      frag.appendChild(arrow);
+    }
+    var panel = document.createElement('div');
+    panel.className = 'district';
+    panel.dataset.key = d.key;
+    panel.style.setProperty('--dc', d.color);
+    var companies = byDistrict[d.key] || [];
+    panel.innerHTML =
+      '<div class="district-head">'+
+        '<div class="district-idx">DISTRICT '+String(i+1).padStart(2,'0')+'</div>'+
+        '<div class="district-title">'+esc(d.label)+'</div>'+
+        '<div class="district-sub">'+esc(d.sub)+'</div>'+
+        '<div class="district-count">'+companies.length+'</div>'+
+      '</div>'+
+      '<div class="district-body">'+companies.map(cardHtml).join('')+'</div>';
+    frag.appendChild(panel);
+
+    var dot = document.createElement('div');
+    dot.className = 'rail-dot';
+    dot.dataset.key = d.key;
+    dot.style.setProperty('--dc', d.color);
+    dot.setAttribute('data-label', d.label);
+    railEl.appendChild(dot);
+  });
+  districtsEl.appendChild(frag);
+}
+buildDistricts();
+
+document.getElementById('stats').textContent = COMPANIES.length + ' companies · ' + EDGES.length + ' relationships · ' + DISTRICTS.length + ' districts';
+
+/* ---------- Card ↔ element lookup ---------- */
+var cardEls = {};
+Array.prototype.forEach.call(document.querySelectorAll('.card'), function(el){ cardEls[el.dataset.id] = el; });
+
+/* ---------- SVG relationship overlay ---------- */
+var svg = document.getElementById('linksLayer');
+var canvasWrap = document.getElementById('canvasWrap');
+
+function centerOf(el){
+  var r = el.getBoundingClientRect();
+  var wrapR = canvasWrap.getBoundingClientRect();
+  return { x: r.left - wrapR.left + r.width/2, y: r.top - wrapR.top + r.height/2 };
+}
+
+function pathBetween(a, b){
+  var dx = (b.x - a.x) * 0.5;
+  return 'M'+a.x+','+a.y+' C'+(a.x+dx)+','+a.y+' '+(b.x-dx)+','+b.y+' '+b.x+','+b.y;
+}
+
+function clearLinks(){ svg.innerHTML = '<defs></defs>'; }
+
+function drawLinksFor(id, opts){
+  clearLinks();
+  var origin = cardEls[id];
+  if(!origin) return;
+  var oc = centerOf(origin);
+  (edgesByCompany[id]||[]).forEach(function(rel){
+    var target = cardEls[rel.to];
+    if(!target) return;
+    var tc = centerOf(target);
+    var style = RELATION_STYLES[rel.type];
+    var from = rel.dir==='out' ? oc : tc;
+    var to = rel.dir==='out' ? tc : oc;
+    var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', pathBetween(from, to));
+    path.setAttribute('stroke', style.color);
+    path.setAttribute('stroke-width', opts.strong ? 2 : 1.4);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('opacity', opts.strong ? 0.85 : 0.55);
+    if(rel.type==='Competes with') path.setAttribute('stroke-dasharray','3,4');
+    if(opts.strong){
+      path.style.filter = 'drop-shadow(0 0 4px '+style.color+')';
+    }
+    svg.appendChild(path);
+  });
+}
+
+/* ---------- Highlight / selection ---------- */
+var selectedId = null;
+var hoveredId = null;
+
+function relatedSet(id){
+  var s = {}; s[id]=true;
+  (edgesByCompany[id]||[]).forEach(function(r){ s[r.to]=true; });
+  return s;
+}
+
+function applyHighlight(id, strong){
+  if(!id){
+    Object.keys(cardEls).forEach(function(k){ cardEls[k].classList.remove('faded','selected'); });
+    clearLinks();
+    return;
+  }
+  var rel = relatedSet(id);
+  Object.keys(cardEls).forEach(function(k){
+    var el = cardEls[k];
+    el.classList.toggle('faded', !rel[k]);
+    el.classList.toggle('selected', strong && k===id);
+  });
+  drawLinksFor(id, {strong: strong});
+}
+
+function selectCompany(id){
+  selectedId = id;
+  applyHighlight(id, true);
+  openSidebar(byId[id]);
+  applyFilters();
+}
+function clearSelection(){
+  selectedId = null;
+  closeSidebar();
+  applyHighlight(hoveredId, false);
+  applyFilters();
+}
+
+districtsEl.addEventListener('mouseover', function(ev){
+  var card = ev.target.closest('.card');
+  if(!card || tourRunning) return;
+  hoveredId = card.dataset.id;
+  if(!selectedId) applyHighlight(hoveredId, false);
+});
+districtsEl.addEventListener('mouseout', function(ev){
+  var card = ev.target.closest('.card');
+  if(!card || tourRunning) return;
+  if(!districtsEl.contains(ev.relatedTarget) || !ev.relatedTarget || !ev.relatedTarget.closest('.card')){
+    hoveredId = null;
+    if(!selectedId) applyHighlight(null, false);
+  }
+});
+districtsEl.addEventListener('click', function(ev){
+  var card = ev.target.closest('.card');
+  if(tourRunning) return;
+  if(!card){ clearSelection(); return; }
+  var id = card.dataset.id;
+  if(selectedId === id){ clearSelection(); return; }
+  selectCompany(id);
+});
+document.addEventListener('keydown', function(ev){ if(ev.key==='Escape'){ if(tourRunning) stopTour(); else clearSelection(); } });
+
+/* keep SVG lines aligned during scroll/resize while something is highlighted */
+districtsEl.addEventListener('scroll', function(){
+  var active = selectedId || hoveredId;
+  if(active) drawLinksFor(active, {strong: !!selectedId});
+  updateRail();
+}, {passive:true});
+window.addEventListener('resize', function(){
+  var active = selectedId || hoveredId;
+  if(active) drawLinksFor(active, {strong: !!selectedId});
+});
+
+/* ---------- Rail (district minimap) ---------- */
+var railDots = Array.prototype.slice.call(document.querySelectorAll('.rail-dot'));
+railDots.forEach(function(dot){
+  dot.addEventListener('click', function(){
+    var panel = document.querySelector('.district[data-key="'+dot.dataset.key+'"]');
+    if(panel) panel.scrollIntoView({behavior:'smooth', inline:'start', block:'nearest'});
+  });
+});
+function updateRail(){
+  var wrapR = districtsEl.getBoundingClientRect();
+  var mid = wrapR.left + wrapR.width*0.28;
+  var panels = Array.prototype.slice.call(document.querySelectorAll('.district'));
+  var closest = null, bestDist = Infinity;
+  panels.forEach(function(p){
+    var r = p.getBoundingClientRect();
+    var d = Math.abs(r.left - mid);
+    if(d < bestDist){ bestDist = d; closest = p; }
+  });
+  if(!closest) return;
+  railDots.forEach(function(dot){ dot.classList.toggle('active', dot.dataset.key === closest.dataset.key); });
+}
+updateRail();
+
+/* ---------- Sidebar ---------- */
+var sidebar = document.getElementById('sidebar');
+document.getElementById('sb-close').addEventListener('click', function(){ clearSelection(); });
+
+function metric(label, val){ return '<div class="sb-metric"><div class="sb-label">'+label+'</div><div class="sb-val">'+esc(val||'—')+'</div></div>'; }
+
+function relHtml(id){
+  var rels = edgesByCompany[id] || [];
+  if(!rels.length) return '<div class="sb-note empty">No mapped relationships yet.</div>';
+  var groups = {upstream:[], downstream:[], partners:[], competitors:[]};
+  rels.forEach(function(r){
+    var style = RELATION_STYLES[r.type];
+    var verb = r.dir==='out' ? style.label : style.reverse;
+    var item = {to:r.to, verb:verb, color:style.color};
+    if(r.type==='Competes with') groups.competitors.push(item);
+    else if(r.type==='Partners with' || r.type==='Invests in' || r.type==='Owns') groups.partners.push(item);
+    else if((r.type==='Supplies' || r.type==='Manufactures for') && r.dir==='out') groups.downstream.push(item);
+    else if((r.type==='Supplies' || r.type==='Manufactures for') && r.dir==='in') groups.upstream.push(item);
+    else if(r.type==='Sells to' && r.dir==='out') groups.downstream.push(item);
+    else if(r.type==='Sells to' && r.dir==='in') groups.upstream.push(item);
+    else groups.partners.push(item);
+  });
+  var order = [["upstream","Upstream suppliers"],["downstream","Downstream customers"],["partners","Partners"],["competitors","Competitors"]];
+  return order.map(function(pair){
+    var key=pair[0], title=pair[1];
+    if(!groups[key].length) return '';
+    return '<div class="sb-section"><div class="sb-section-title">'+title+' <span class="n">'+groups[key].length+'</span></div>'+
+      groups[key].map(function(it){
+        return '<div class="rel-item" data-jump="'+esc(it.to)+'">'+
+          '<span class="rel-dot" style="background:'+it.color+'"></span>'+
+          '<span class="rel-type">'+esc(it.verb)+'</span>'+
+          '<span class="rel-name">'+esc(it.to)+'</span></div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+}
+
+function positionTrack(currentOrder){
+  return DISTRICTS.map(function(d,i){
+    var cls = i < currentOrder ? 'past' : (i===currentOrder ? 'now' : '');
+    return '<div class="sb-tick '+cls+'" style="'+(cls?('background:'+(i===currentOrder?d.color:'')):'')+'"></div>';
+  }).join('');
+}
+
+function openSidebar(c){
+  var d = DISTRICT_BY_KEY[c.district];
+  document.getElementById('sidebar-content').innerHTML =
+    '<div style="--dc:'+d.color+'">'+
+    '<div class="sb-top" style="--dc:'+d.color+'">'+
+      '<div class="sb-logo" style="--dc:'+d.color+'">'+
+        '<span class="fb">'+esc(initials(c.id))+'</span>'+
+        '<img src="'+logoUrl(c.domain)+'" alt="" onload="this.classList.add(\'loaded\')" onerror="this.remove()">'+
+      '</div>'+
+      '<div><h2>'+esc(c.id)+'</h2><div class="sb-hq">'+esc(c.hq)+'</div></div>'+
+    '</div>'+
+    '<div class="sb-position">'+
+      '<div class="sb-position-label">'+esc(c.id)+' <span style="color:var(--text-faint)">→</span> <b>'+esc(d.role)+'</b></div>'+
+      '<div class="sb-track">'+positionTrack(d.order)+'</div>'+
+    '</div>'+
+    '<span class="sb-badge" style="background:color-mix(in srgb,'+d.color+' 18%, transparent); color:'+d.color+'; border-color:color-mix(in srgb,'+d.color+' 45%, transparent)">'+esc(c.sub)+'</span>'+
+    '<div class="sb-desc">'+esc(c.desc)+'</div>'+
+    '<div class="sb-grid">'+
+      metric('AI exposure', c.ai)+
+      metric('Size tier', c.size)+
+      metric('Revenue driver', c.revenue)+
+      metric('TransPak relevance', c.transpak)+
+    '</div>'+
+    '<div class="sb-section"><div class="sb-section-title">Primary customers</div><div class="sb-val">'+esc(c.customers)+'</div></div>'+
+    '<div class="sb-section"><div class="sb-section-title">Connection to AI / cloud</div><div class="sb-val">'+esc(c.connection)+'</div></div>'+
+    relHtml(c.id)+
+    '<div class="sb-section"><div class="sb-section-title">My notes</div><div class="sb-note'+(c.notes?'':' empty')+'">'+esc(c.notes||'No internal notes yet — add TransPak-specific context here.')+'</div></div>'+
+    '<div class="sb-section"><div class="sb-section-title">Coming soon</div>'+
+      '<div class="sb-future"><span class="lbl">Market cap</span><span class="soon">Soon</span></div>'+
+      '<div class="sb-future"><span class="lbl">Stock price</span><span class="soon">Soon</span></div>'+
+      '<div class="sb-future"><span class="lbl">Latest news</span><span class="soon">Soon</span></div>'+
+      '<div class="sb-future"><span class="lbl">SEC filings</span><span class="soon">Soon</span></div>'+
+    '</div>'+
+    '</div>';
+  sidebar.classList.add('open');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-jump]'), function(el){
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); jumpTo(el.dataset.jump); });
+  });
+}
+function closeSidebar(){ sidebar.classList.remove('open'); }
+function jumpTo(id){
+  if(!byId[id]) return;
+  var panel = cardEls[id] && cardEls[id].closest('.district');
+  if(panel) panel.scrollIntoView({behavior:'smooth', inline:'start', block:'nearest'});
+  selectCompany(id);
+}
+
+/* ---------- Search & TransPak lens ---------- */
+var transpakOn = false;
+function applyFilters(){
+  var q = document.getElementById('search').value.trim().toLowerCase();
+  if(selectedId) return; // selection highlight takes priority
+  Object.keys(cardEls).forEach(function(k){
+    var c = byId[k];
+    var matchesQ = !q || c.id.toLowerCase().indexOf(q)!==-1 || c.sub.toLowerCase().indexOf(q)!==-1;
+    var matchesT = !transpakOn || c.transpak === 'Yes';
+    cardEls[k].classList.toggle('dim', !(matchesQ && matchesT));
+  });
+}
+document.getElementById('search').addEventListener('input', function(){
+  if(selectedId) clearSelection();
+  applyFilters();
+});
+document.getElementById('btn-transpak').addEventListener('click', function(){
+  transpakOn = !transpakOn;
+  this.classList.toggle('on', transpakOn);
+  applyFilters();
+});
+
+/* ---------- Theme ---------- */
+document.getElementById('btn-theme').addEventListener('click', function(){
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  document.documentElement.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  this.innerHTML = isLight ? '☾ Light' : '☀ Dark';
+});
+
+/* ---------- Guided tour: "Trace the AI supply chain" ---------- */
+var tourRunning = false, tourTimer = null, tourStep = 0;
+var tourCaption = document.getElementById('tourCaption');
+document.getElementById('btn-tour').addEventListener('click', function(){ tourRunning ? stopTour() : startTour(); });
+document.getElementById('tc-skip').addEventListener('click', stopTour);
+
+function startTour(){
+  tourRunning = true; tourStep = 0;
+  document.getElementById('btn-tour').classList.add('on');
+  clearSelection();
+  Object.keys(cardEls).forEach(function(k){ cardEls[k].classList.add('faded'); });
+  runTourStep();
+}
+function stopTour(){
+  tourRunning = false;
+  clearTimeout(tourTimer);
+  document.getElementById('btn-tour').classList.remove('on');
+  tourCaption.classList.remove('show');
+  Array.prototype.forEach.call(document.querySelectorAll('.card.tour-active'), function(el){ el.classList.remove('tour-active'); });
+  Object.keys(cardEls).forEach(function(k){ cardEls[k].classList.remove('faded','selected'); });
+  clearLinks();
+}
+function runTourStep(){
+  if(!tourRunning) return;
+  var id = TOUR_SEQUENCE[tourStep];
+  var c = byId[id];
+  var d = DISTRICT_BY_KEY[c.district];
+  Array.prototype.forEach.call(document.querySelectorAll('.card.tour-active'), function(el){ el.classList.remove('tour-active'); });
+  var el = cardEls[id];
+  el.classList.remove('faded'); el.classList.add('tour-active');
+  var panel = el.closest('.district');
+  panel.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
+
+  document.getElementById('tc-name').textContent = id;
+  document.getElementById('tc-role').textContent = d.role;
+  tourCaption.style.setProperty('--dc', d.color);
+  tourCaption.classList.add('show');
+
+  if(tourStep > 0){
+    var prev = byId[TOUR_SEQUENCE[tourStep-1]];
+    var a = centerOf(cardEls[prev.id]), b = centerOf(cardEls[id]);
+    var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', pathBetween(a,b));
+    path.setAttribute('stroke', d.color);
+    path.setAttribute('stroke-width','2.5');
+    path.setAttribute('fill','none');
+    path.setAttribute('opacity','0.9');
+    path.style.filter = 'drop-shadow(0 0 6px '+d.color+')';
+    svg.appendChild(path);
+  }
+
+  tourStep++;
+  if(tourStep < TOUR_SEQUENCE.length){
+    tourTimer = setTimeout(runTourStep, 1500);
+  } else {
+    tourTimer = setTimeout(function(){
+      tourCaption.classList.remove('show');
+      tourTimer = setTimeout(stopTour, 600);
+    }, 1800);
+  }
+}
+
+/* ---------- Boot ---------- */
+updateRail();
+</script>
+</body>
+</html>
